@@ -1,7 +1,13 @@
 [package]
 name = "goplus_rs"
 version = "0.1.0"
+authors = ["Austin Palmer atx.jp.dev@gmail.com"]
 edition = "2021"
+description = "This repository contains a Rust API wrapper for interacting with GoPlusLabs services for risk metrics and analysis on tokens, smart contracts, and wallets across different chain ecosystems."
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/austinjp17/GoPlus_rs"
+keywords = ["GoPlus", "API", "Token", "Risk"]
+categories = ["API bindings"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
