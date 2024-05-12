@@ -1,3 +1,9 @@
+//TODO: Look for env app_key
+
+
+
+use std::time::UNIX_EPOCH;
+
 use reqwest::Client;
 
 mod api_structs;
@@ -20,18 +26,45 @@ pub struct Session {
 
 impl Session {
     pub fn new() -> Self {
-        Self {
-            inner: Client::new(),
-            access_token: None,
+        // If app_key env var set
+        let app_key = std::env::var("GP_PUBLIC");
+        let secret_key = std::env::var("GP_SECRET");
+
+        if app_key.is_err() || secret_key.is_err(){
+            // No access token
+            tracing::warn!("Set enviornment variables to get access code");
+            tracing::warn!("  `export GP_PUBLIC = $APP_PUBLIC_KEY$`");
+            tracing::warn!("  `export GP_PUBLIC = $APP_PRIVATE_KEY$`");
+            Self {
+                inner: Client::new(),
+                access_token: None,
+            }
+        } 
+        else {
+            // UNCERTAIN IF WORKS, CAN'T TEST W/OUT KEYS
+            use sha1::{Sha1, Digest};
+            let mut hasher = Sha1::new();
+            let time: u64 = std::time::SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+            let hash_str = format!("{}{}{}", app_key.unwrap(), time, secret_key.unwrap());
+            hasher.update(hash_str);
+            let str_hash = format!("{:x}", hasher.finalize());
             
+            Self {
+                inner: Client::new(),
+                access_token: Some(str_hash),
+            }
         }
+
+        
     }
 
     /// Obtains an access token using SHA-1 signature method.
     ///
     /// # Sign Method
     /// Concatenate `app_key`, `time`, and `app_secret` in turn, and apply SHA-1 hashing.
-    ///
+    /// 
+    /// `time` should be +- 1000s around the current timestamp
+    /// 
     /// # Example
     /// ```
     /// let app_key = "mBOMg20QW11BbtyH4Zh0";
