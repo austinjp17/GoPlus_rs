@@ -1,22 +1,10 @@
 use reqwest::Client;
 
-
 mod api_structs;
 use api_structs::*;
 use serde_json::{json, Value};
 
 const BASE_URL: &str = "https://api.gopluslabs.io/api/v1";
-
-
-pub struct Session {
-    inner: Client,
-    #[allow(dead_code)]
-    access_token: Option<String>,
-}
-
-// pub fn handle_res(res: Response) -> Result<Value, Error> {
-
-// }
 
 pub enum Error {
     RequestError(reqwest::Error),
@@ -24,6 +12,11 @@ pub enum Error {
     StatusError,
 }
 
+#[derive(Default)]
+pub struct Session {
+    inner: Client,
+    access_token: Option<String>,
+}
 
 impl Session {
     pub fn new() -> Self {
@@ -55,7 +48,7 @@ impl Session {
     /// # Example Usage
     /// ```
     /// let mut instance = Session::new(None);
-    /// instance.get_access_token("mBOMg20QW11BbtyH4Zh0", "7293d385b9225b3c3f232b76ba97255d0e21063e", 1647847498);
+    /// instance.get_access_token("mBOMg20QW11BbtyH4Zh0", "7293d385b9225b3c3f232b76ba97255d0e21063e", 1647847498).await?;
     /// ```
     pub async fn get_access_token(&mut self, app_key: &str, signature: &str, time: u64) -> Result<(), anyhow::Error> {
         let url = format!("{}/token", BASE_URL);
@@ -89,6 +82,16 @@ impl Session {
 
     }
     
+    /// Retrieves a list of supported blockchain chains from the API.
+    ///
+    /// 
+    /// # Example Usage
+    /// ```
+    /// let session = Session::new();
+    /// let response = session.supported_chains().await?;
+    /// let chains: Vec<Chain> = response.result;
+    /// ```
+    /// Tablular form of return data available [here](https://docs.gopluslabs.io/reference/response-details-9)
     pub async fn supported_chains(&self) -> Result<SupportedChainsResponse, anyhow::Error> {
         let url = format!("{BASE_URL}/supported_chains");
 
@@ -102,6 +105,19 @@ impl Session {
             .await?)
     }
 
+    /// Fetches token risk data based on the blockchain chain ID and address.
+    ///
+    /// # Parameters
+    /// - `chain_id`: The blockchain chain ID.
+    /// - `addr`: The address to check.
+    ///
+    /// # Example Usage
+    /// ```
+    /// let session = Session::new();
+    /// let response = session.token_risk("56", "0xEa51801b8F5B88543DdaD3D1727400c15b209D8f").await?;
+    /// let risk_data: Hashmap<String, TokenData> = response.result;
+    /// ```
+    /// Response fields in depth [here](https://docs.gopluslabs.io/reference/response-details)
     pub async fn token_risk(&self, chain_id: &str, addr: &str) -> Result<TokenResponse, anyhow::Error> {
         let url = format!(
             "{}/token_security/{}", BASE_URL, chain_id
@@ -116,7 +132,27 @@ impl Session {
             .await?)
     }
 
-    pub async fn address_risk(&self, addr: &str, chain_id: Option<&str>) -> Result<AccountResponse, anyhow::Error> {
+    /// Retrieves risk information about an address, optionally filtered by chain ID.
+    ///
+    /// If only the address is provided without specifying the chain ID, the `contract_address` 
+    /// field in the response may be omitted. This occurs because the same address can represent 
+    /// a contract on one blockchain but not on another. Determination of `contract_address` involves
+    /// querying a third-party blockchain browser interface, which may delay the response. 
+    /// The `contract_address` field may initially be empty due to this delay. A subsequent request 
+    /// after about 5 seconds typically returns complete data, including the `contract_address`.
+    ///
+    /// # Parameters
+    /// - `addr`: The address to analyze.
+    /// - `chain_id`: Optional blockchain chain ID for filtering.
+    ///
+    /// # Example Usage
+    /// ```
+    /// let session = Session::new();
+    /// let response = session.address_risk("0xEa51801b8F5B88543DdaD3D1727400c15b209D8f", Some("56")).await;
+    /// let risk_data: AccountRisk = response.result;
+    /// ```
+    /// Response fields in depth [here](https://docs.gopluslabs.io/reference/response-details-1)
+    pub async fn address_risk(&self, addr: &str, chain_id: Option<&str>) -> Result<AccountRiskResponse, anyhow::Error> {
         let url = format!("{}/address_security/{}", BASE_URL, addr);
 
         Ok(self.inner.get(url)
@@ -124,13 +160,12 @@ impl Session {
             .query(&[("chain_id", chain_id.unwrap_or("None"))])
             .send()
             .await?
-            .json::<AccountResponse>()
+            .json::<AccountRiskResponse>()
             .await?)
     }
 
     pub async fn approval_security_v1(&self, chain_id: &str, contract_addr: &str) -> Result<ASresponse, anyhow::Error> {
         let url = format!("{}/approval_security/{}", BASE_URL, chain_id);
-
         Ok(self.inner.get(url)
             .header("access_token", self.access_token.clone().unwrap_or("None".to_string()))
             .query(&[("contract_addresses", contract_addr)])
@@ -145,6 +180,28 @@ impl Session {
         todo!();
     }
 
+    /// Decodes ABI input data for interacting with smart contracts.
+    ///
+    /// # Parameters
+    /// - `chain_id`: Blockchain chain ID.
+    /// - `data`: ABI data to decode.
+    /// - `contract_addr`: Optional contract address.
+    /// - `signer`: Optional signer.
+    /// - `txn_type`: Optional transaction type.
+    ///
+    /// # Example Usage
+    /// ```
+    /// let session = Session::new();
+    /// let response = session.abi_decode(
+    ///     "56", 
+    ///     "0xa9059cbb00000000000000000000000055d398326f99059ff775485246999027b319795500000000000000000000000000000000000000000000000acc749097d9d00000", 
+    ///     Some("0x55d398326f99059ff775485246999027b3197955"),
+    ///     // None,
+    ///     None, 
+    ///     None
+    /// ).await?;
+    /// ```
+    /// Response fields in depth [here](https://docs.gopluslabs.io/reference/response-details-4)
     pub async fn abi_decode(&self, 
         chain_id: &str, 
         data: &str,
@@ -172,7 +229,21 @@ impl Session {
             .await?)
     }
 
-
+    /// Evaluates NFT risk for a specific contract address on a blockchain.
+    ///
+    /// # Parameters
+    /// - `chain_id`: Blockchain chain ID.
+    /// - `contract_addr`: Contract address.
+    /// - `token_id`: Optional token ID.
+    ///
+    /// # Example Usage
+    /// ```
+    /// let session = Session::new();
+    /// let response = session.nft_risk("1", "0x...", Some("123")).await?;
+    /// let nft_risk: NftRisk = response.result;
+    /// ```
+    /// 
+    /// Response fields explained in depth [here](https://docs.gopluslabs.io/reference/response-details-5)
     pub async fn nft_risk(&self, chain_id: &str, contract_addr: &str, token_id: Option<&str>) -> Result<NftRiskResponse, anyhow::Error> {
         let url = format!("{}/nft_security/{}",BASE_URL, chain_id);
 
@@ -199,6 +270,17 @@ impl Session {
             .await?)
     }
 
+    /// Analyzes phishing risks for a given site URL.
+    ///
+    /// # Parameters
+    /// - `site_url`: URL of the site to check.
+    ///
+    /// # Example Usage
+    /// ```
+    /// let session = Session::new();
+    /// let response = session.phishing_site_risk("go-ethdenver.com").await?;
+    /// ```
+    /// Response fields in depth [here](https://docs.gopluslabs.io/reference/phishingsiteusingget)
     pub async fn phishing_site_risk(&self, site_url: &str) -> Result<PhishingSiteResponse, anyhow::Error> {
         let url = format!("{}/phishing_site", BASE_URL);
 
@@ -211,6 +293,18 @@ impl Session {
             .await?)
     }
     
+    /// Assesses the risk of a rug pull for a contract on a specific blockchain.
+    ///
+    /// # Parameters
+    /// - `chain_id`: Blockchain chain ID.
+    /// - `contract_addr`: Contract address.
+    ///
+    /// # Example Usage
+    /// ```
+    /// let session = Session::new();
+    /// let response = session.rug_pull_risk("1", "0x6B175474E89094C44Da98b954EedeAC495271d0F").await?;
+    /// ```
+    /// Response fields in depth [here](https://docs.gopluslabs.io/reference/response-details-7)
     pub async fn rug_pull_risk(&self, chain_id: &str, contract_addr: &str) -> Result<RugPullRiskResponse, anyhow::Error> {
         let url = format!("{}/rugpull_detecting/{}", BASE_URL, chain_id);
 

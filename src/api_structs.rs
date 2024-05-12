@@ -119,17 +119,17 @@ pub struct NftInfo {
 }
 
 #[derive(Deserialize, Debug, Clone)]
-pub struct AccountResponse {
+pub struct AccountRiskResponse {
     code: u32,
     message: String,
-    result: AccountResult,
+    result: AccountRisk,
 }
 
 /// Data on the security and reliability of a given account
 /// 
 /// Contract address not returned if address passed without chain_id
 #[derive(Deserialize, Debug, Clone)]
-pub struct AccountResult {
+pub struct AccountRisk {
     blacklist_doubt: String,
     blackmail_activities: String,
     contract_address: Option<String>,
@@ -198,12 +198,12 @@ pub struct Owner {
 pub struct NftRiskResponse {
     code: u32,
     message: String,
-    result: NftData,
+    result: NftRisk,
 }
 
 
 #[derive(Deserialize, Debug, Clone)]
-pub struct NftData {
+pub struct NftRisk {
     average_price_24h: f64,
     create_block_number: Option<u64>,
     creator_address: Option<String>,
@@ -278,12 +278,12 @@ pub struct WebsiteContractSecurity {
     pub contract: String,
     pub is_contract: i32,
     pub is_open_source: i32,
-    pub nft_risk: NftRisk,
+    pub nft_risk: NftData,
     pub standard: String,
 }
 
 #[derive(Deserialize, Debug, Clone)]
-pub struct NftRisk {
+pub struct NftData {
     pub nft_open_source: i32,
     pub nft_proxy: i32,
     pub oversupply_minting: i32,
