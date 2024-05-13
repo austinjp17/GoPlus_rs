@@ -1,4 +1,3 @@
-// TODO: Error handling
 use std::time::UNIX_EPOCH;
 use reqwest::Client;
 use serde_json::{json, Value};
@@ -6,6 +5,7 @@ use thiserror::Error;
 
 mod api_structs;
 use api_structs::*;
+
 const BASE_URL: &str = "https://api.gopluslabs.io/api/v1";
 
 
@@ -27,14 +27,14 @@ impl From<reqwest::Error> for GpError {
     }
 }
 
-
-
+/// API Driver - handles all interaction with GoPlus endpoints
 #[derive(Default)]
 pub struct Session {
     inner: Client,
     access_token: Option<String>,
 }
 
+/// Used in V2Approval Call
 pub enum V2ApprovalERC {
     ERC20,
     ERC721,

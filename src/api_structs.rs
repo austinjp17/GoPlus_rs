@@ -1,15 +1,12 @@
 #![allow(dead_code)]
 use serde::{Deserialize, Serialize};
 
-
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SupportedChainsResponse {
     code: u32,
     message: String,
-    result: Vec<Chain>
+    result: Vec<Chain>,
 }
-
 
 // Get available chains call result struct
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -24,7 +21,6 @@ pub struct TokenResponse {
     message: String,
     result: std::collections::HashMap<String, TokenData>,
 }
-
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct TokenData {
@@ -126,7 +122,7 @@ pub struct AccountRiskResponse {
 }
 
 /// Data on the security and reliability of a given account
-/// 
+///
 /// Contract address not returned if address passed without chain_id
 #[derive(Deserialize, Debug, Clone)]
 pub struct AccountRisk {
@@ -159,7 +155,7 @@ pub struct V1ApprovalResponse {
 pub struct V1ApprovalResult {
     contract_name: Option<String>,
     creator_address: Option<String>,
-    deployed_time: Option<u64>,  // Assuming it's a timestamp in seconds
+    deployed_time: Option<u64>, // Assuming it's a timestamp in seconds
     doubt_list: u32,
     is_contract: u32,
     is_open_source: Option<u32>,
@@ -168,7 +164,7 @@ pub struct V1ApprovalResult {
     tag: Option<String>,
     trust_list: u32,
     contract_scan: ContractScan,
-    risky_approval: RiskyApproval
+    risky_approval: RiskyApproval,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -191,7 +187,7 @@ pub struct ContractScan {
 pub struct Owner {
     owner_name: Option<String>,
     owner_address: Option<String>,
-    owner_type: Option<String>
+    owner_type: Option<String>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -200,7 +196,6 @@ pub struct NftRiskResponse {
     message: String,
     result: NftRisk,
 }
-
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct NftRisk {
@@ -318,13 +313,13 @@ pub struct RugPullResult {
 pub struct AccessCodeResponse {
     pub code: u32,
     pub message: String,
-    pub result: Option<AccessCodeResult>
+    pub result: Option<AccessCodeResult>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct AccessCodeResult {
     pub access_token: String,
-    pub expires_in: u64
+    pub expires_in: u64,
 }
 #[derive(Deserialize, Debug, Clone)]
 pub struct AbiDecodeResponse {
@@ -355,8 +350,7 @@ pub struct Param {
     pub type_field: Option<String>,
     pub tuple: Option<serde_json::Value>,
     #[serde(rename = "struct")]
-    pub struct_field: Option<serde_json::Value>
-    
+    pub struct_field: Option<serde_json::Value>,
 }
 
 #[derive(Clone, Deserialize, Debug)]
@@ -373,7 +367,7 @@ pub struct AddressInfo {
 pub struct V2ApprovalResponse {
     pub code: u32,
     pub message: String,
-    pub result: Vec<V2ApprovalResult>
+    pub result: Vec<V2ApprovalResult>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -387,7 +381,7 @@ pub struct V2ApprovalResult {
     pub malicious_behavior: Option<Vec<String>>,
     pub token_address: String,
     pub token_name: String,
-    pub token_symbol: String
+    pub token_symbol: String,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -410,6 +404,6 @@ pub struct V2ApprovalAddressInfo {
     is_contract: u64,
     is_open_source: u64,
     malicious_behavior: Option<Vec<String>>, // Adjusted to Vec<String> if behavior is just a list of strings
-    tag: Option<String>, // Optional to handle both Null and String cases
+    tag: Option<String>,                     // Optional to handle both Null and String cases
     trust_list: u64,
 }
