@@ -1,11 +1,11 @@
 // TODO: Error handling
 use std::time::UNIX_EPOCH;
 use reqwest::Client;
-mod api_structs;
-use api_structs::*;
 use serde_json::{json, Value};
 use thiserror::Error;
-use reqwest::StatusCode;
+
+mod api_structs;
+use api_structs::*;
 const BASE_URL: &str = "https://api.gopluslabs.io/api/v1";
 
 
@@ -19,7 +19,6 @@ pub enum GpError {
 
 impl From<reqwest::Error> for GpError {
     fn from(value: reqwest::Error) -> Self {
-        let str_err = value.to_string();
         match value.to_string().contains("missing field") {
             true => Self::ParseError(value.to_string()),
             false => Self::RequestError(value.status().unwrap().as_u16(), value.to_string())
@@ -151,7 +150,7 @@ impl Session {
     /// let risk_data: AccountRisk = response.result;
     /// ```
     /// Response fields in depth [here](https://docs.gopluslabs.io/reference/response-details-1)
-    pub async fn address_risk(&self, addr: &str, chain_id: Option<&str>) -> Result<AccountRiskResponse, anyhow::Error> {
+    pub async fn address_risk(&self, addr: &str, chain_id: Option<&str>) -> Result<AccountRiskResponse, GpError> {
         let url = format!("{}/address_security/{}", BASE_URL, addr);
 
         Ok(self.inner.get(url)
@@ -159,23 +158,25 @@ impl Session {
             .query(&[("chain_id", chain_id.unwrap_or("None"))])
             .send()
             .await?
+            .error_for_status()?
             .json::<AccountRiskResponse>()
             .await?)
     }
 
-    pub async fn approval_security_v1(&self, chain_id: &str, contract_addr: &str) -> Result<V1ApprovalResponse, anyhow::Error> {
+    pub async fn approval_security_v1(&self, chain_id: &str, contract_addr: &str) -> Result<V1ApprovalResponse, GpError> {
         let url = format!("{}/approval_security/{}", BASE_URL, chain_id);
         Ok(self.inner.get(url)
             .header("access_token", self.access_token.clone().unwrap_or("None".to_string()))
             .query(&[("contract_addresses", contract_addr)])
             .send()
             .await?
+            .error_for_status()?
             .json::<V1ApprovalResponse>()
             .await?)
     }
 
     
-    pub async fn approval_security_v2(&self, erc: V2ApprovalERC, chain_id: &str, address: &str) -> Result<V2ApprovalResponse, anyhow::Error> {
+    pub async fn approval_security_v2(&self, erc: V2ApprovalERC, chain_id: &str, address: &str) -> Result<V2ApprovalResponse, GpError> {
         let base_url = "https://api.gopluslabs.io/api/v2";
         let url = match erc {
             V2ApprovalERC::ERC20 => format!("{}/token_approval_security/{}", base_url, chain_id),
@@ -188,6 +189,7 @@ impl Session {
             .query(&[("addresses", address)])
             .send()
             .await?
+            .error_for_status()?
             .json::<V2ApprovalResponse>()
             .await?)
 
@@ -258,7 +260,7 @@ impl Session {
     /// ```
     /// 
     /// Response fields explained in depth [here](https://docs.gopluslabs.io/reference/response-details-5)
-    pub async fn nft_risk(&self, chain_id: &str, contract_addr: &str, token_id: Option<&str>) -> Result<NftRiskResponse, anyhow::Error> {
+    pub async fn nft_risk(&self, chain_id: &str, contract_addr: &str, token_id: Option<&str>) -> Result<NftRiskResponse, GpError> {
         let url = format!("{}/nft_security/{}",BASE_URL, chain_id);
 
         Ok(self.inner.get(url)
@@ -272,6 +274,7 @@ impl Session {
 
     // TODO: No successfully found url
     pub async fn dapp_risk_by_url(&self, dapp_url: &str) -> Result<Value, anyhow::Error> {
+        tracing::warn!("I have been unable to get any response but 'DAPP NOT FOUND', but it should work so you are welcome to try :)");
         // todo!("Fails on all tried urls idk");
         let url = format!("{}/dapp_security", BASE_URL);
         
@@ -280,6 +283,7 @@ impl Session {
             .query(&[("url", dapp_url)])
             .send()
             .await?
+            .error_for_status()?
             .json::<Value>()
             .await?)
     }
@@ -295,7 +299,7 @@ impl Session {
     /// let response = session.phishing_site_risk("go-ethdenver.com").await?;
     /// ```
     /// Response fields in depth [here](https://docs.gopluslabs.io/reference/phishingsiteusingget)
-    pub async fn phishing_site_risk(&self, site_url: &str) -> Result<PhishingSiteResponse, anyhow::Error> {
+    pub async fn phishing_site_risk(&self, site_url: &str) -> Result<PhishingSiteResponse, GpError> {
         let url = format!("{}/phishing_site", BASE_URL);
 
         Ok(self.inner.get(url)
@@ -303,6 +307,7 @@ impl Session {
             .query(&[("url", site_url)])
             .send()
             .await?
+            .error_for_status()?
             .json::<PhishingSiteResponse>()
             .await?)
     }
@@ -319,7 +324,7 @@ impl Session {
     /// let response = session.rug_pull_risk("1", "0x6B175474E89094C44Da98b954EedeAC495271d0F").await?;
     /// ```
     /// Response fields in depth [here](https://docs.gopluslabs.io/reference/response-details-7)
-    pub async fn rug_pull_risk(&self, chain_id: &str, contract_addr: &str) -> Result<RugPullRiskResponse, anyhow::Error> {
+    pub async fn rug_pull_risk(&self, chain_id: &str, contract_addr: &str) -> Result<RugPullRiskResponse, GpError> {
         let url = format!("{}/rugpull_detecting/{}", BASE_URL, chain_id);
 
         Ok(self.inner.get(url)
@@ -327,6 +332,7 @@ impl Session {
             .query(&[("contract_addresses", contract_addr)])
             .send()
             .await?
+            .error_for_status()?
             .json::<RugPullRiskResponse>()
             .await?)
     }
@@ -356,7 +362,7 @@ impl Session {
     /// let mut instance = Session::new(None);
     /// instance.get_access_token("mBOMg20QW11BbtyH4Zh0", "7293d385b9225b3c3f232b76ba97255d0e21063e", 1647847498).await?;
     /// ```
-    pub async fn get_access_token(&mut self, app_key: &str, signature: &str, time: u64) -> Result<(), anyhow::Error> {
+    pub async fn get_access_token(&mut self, app_key: &str, signature: &str, time: u64) -> Result<(), GpError> {
         let url = format!("{}/token", BASE_URL);
         // How to do body params?
 
@@ -371,6 +377,7 @@ impl Session {
             .json(&params)
             .send()
             .await?
+            .error_for_status()?
             .json::<AccessCodeResponse>()
             .await?;
 
@@ -393,7 +400,7 @@ impl Session {
 
 
 
-pub fn interpret_status_code(code: u32) -> &'static str {
+pub fn interpret_gp_status_code(code: u32) -> &'static str {
     match code {
         1 => "Complete data prepared",
         2 => "Partial data obtained. The complete data can be requested again in about 15 seconds.",

@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SupportedChainsResponse {
-    extra: u32,
     code: u32,
     message: String,
     result: Vec<Chain>

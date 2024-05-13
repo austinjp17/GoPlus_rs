@@ -17,11 +17,18 @@ This repository contains a Rust API wrapper for interacting with GoPlusLabs serv
     export GP_PUBLIC = $APP_PRIVATE_KEY$
     ```
 
-3. Create persistant session
+3. Create and use persistant session
    ```
+    // Tracing initialization
+    tracing_subscriber::fmt()
+        .with_max_level(Level::INFO) 
+        .init();
+
     use goplus_rs;
     let instance = goplus_rs::Session::new();
+    let res = instance.supported_chains();
    ```
+
 
 
 
