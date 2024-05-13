@@ -23,7 +23,6 @@ This repository contains a Rust API wrapper for interacting with GoPlusLabs serv
     let instance = goplus_rs::Session::new();
    ```
 
-4. Session used for all interactions with GoPlus
 
 
 <!-- 

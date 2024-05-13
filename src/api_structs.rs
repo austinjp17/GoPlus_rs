@@ -368,3 +368,48 @@ pub struct AddressInfo {
     pub standard: String,
     pub symbol: String,
 }
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct V2ApprovalResponse {
+    pub code: u32,
+    pub message: String,
+    pub result: Vec<V2ApprovalResult>
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct V2ApprovalResult {
+    pub approved_list: Vec<V2ApprovedContract>,
+    pub balance: String,
+    pub chain_id: String,
+    pub decimals: u32,
+    pub is_open_source: u8,
+    pub malicious_address: u8,
+    pub malicious_behavior: Option<Vec<String>>,
+    pub token_address: String,
+    pub token_name: String,
+    pub token_symbol: String
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct V2ApprovedContract {
+    pub address_info: V2ApprovalAddressInfo,
+    pub approved_amount: String,
+    pub approved_contract: String,
+    pub approved_time: u64,
+    pub hash: String,
+    pub initial_approval_hash: String,
+    pub initial_approval_time: u64,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct V2ApprovalAddressInfo {
+    contract_name: Option<String>,
+    creator_address: String,
+    deployed_time: u64,
+    doubt_list: u64,
+    is_contract: u64,
+    is_open_source: u64,
+    malicious_behavior: Option<Vec<String>>, // Adjusted to Vec<String> if behavior is just a list of strings
+    tag: Option<String>, // Optional to handle both Null and String cases
+    trust_list: u64,
+}

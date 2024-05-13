@@ -1,18 +1,13 @@
-//TODO: Look for env app_key
-
-
-
-use std::time::UNIX_EPOCH;
-
+// TODO: Error handling
+use std::{sync::Arc, time::UNIX_EPOCH};
 use reqwest::Client;
-
 mod api_structs;
 use api_structs::*;
 use serde_json::{json, Value};
 
 const BASE_URL: &str = "https://api.gopluslabs.io/api/v1";
 
-pub enum Error {
+pub enum GpError {
     RequestError(reqwest::Error),
     ParseError,
     StatusError,
@@ -22,6 +17,13 @@ pub enum Error {
 pub struct Session {
     inner: Client,
     access_token: Option<String>,
+}
+
+// TODO
+pub enum V2ApprovalERC {
+    ERC20,
+    ERC721,
+    ERC1155
 }
 
 impl Session {
@@ -47,7 +49,8 @@ impl Session {
             let time: u64 = std::time::SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
             let hash_str = format!("{}{}{}", app_key.unwrap(), time, secret_key.unwrap());
             hasher.update(hash_str);
-            let str_hash = format!("{:x}", hasher.finalize());
+            let f = hasher.finalize();
+            let str_hash = format!("{:x}", f);
             
             Self {
                 inner: Client::new(),
@@ -58,63 +61,6 @@ impl Session {
         
     }
 
-    /// Obtains an access token using SHA-1 signature method.
-    ///
-    /// # Sign Method
-    /// Concatenate `app_key`, `time`, and `app_secret` in turn, and apply SHA-1 hashing.
-    /// 
-    /// `time` should be +- 1000s around the current timestamp
-    /// 
-    /// # Example
-    /// ```
-    /// let app_key = "mBOMg20QW11BbtyH4Zh0";
-    /// let time = 1647847498;
-    /// let app_secret = "V6aRfxlPJwN3ViJSIFSCdxPvneajuJsh";
-    /// let sign = "sha1(mBOMg20QW11BbtyH4Zh01647847498V6aRfxlPJwN3ViJSIFSCdxPvneajuJsh)"; // This results in `7293d385b9225b3c3f232b76ba97255d0e21063e`
-    /// ```
-    ///
-    /// # Parameters
-    /// - `app_key`: Application key provided by the service.
-    /// - `signature`: Computed SHA-1 hash as a string.
-    /// - `time`: Current time as a UNIX timestamp.
-    ///
-    /// # Example Usage
-    /// ```
-    /// let mut instance = Session::new(None);
-    /// instance.get_access_token("mBOMg20QW11BbtyH4Zh0", "7293d385b9225b3c3f232b76ba97255d0e21063e", 1647847498).await?;
-    /// ```
-    pub async fn get_access_token(&mut self, app_key: &str, signature: &str, time: u64) -> Result<(), anyhow::Error> {
-        let url = format!("{}/token", BASE_URL);
-        // How to do body params?
-
-        let params = json!({
-            "app_key": app_key,
-            "sign": signature,
-            "time": time,
-        });
-
-        let access_code_res = self.inner.get(url)
-            .header("access_token", self.access_token.clone().unwrap_or("None".to_string()))
-            .json(&params)
-            .send()
-            .await?
-            .json::<AccessCodeResponse>()
-            .await?;
-
-        // access_code_res.result.unwrap().expires_in;
-        if access_code_res.code == 1 {
-            tracing::info!("New access token expires in {} minutes", (access_code_res.result.as_ref().unwrap().expires_in)/60);
-
-            self.access_token = Some(access_code_res.result.unwrap().access_token);
-        } else {
-            tracing::error!("Error getting access token\nCode: {}", access_code_res.code)
-            // ERROR HANDLING
-        };
-        
-        Ok(())
-
-    }
-    
     /// Retrieves a list of supported blockchain chains from the API.
     ///
     /// 
@@ -208,9 +154,27 @@ impl Session {
             .await?)
     }
 
-    // TODO
-    pub async fn approval_security_v2(&self) {
-        todo!();
+    
+    pub async fn approval_security_v2(&self, erc: V2ApprovalERC, chain_id: &str, address: &str) -> Result<V2ApprovalResponse, anyhow::Error> {
+        
+        let base_url = match erc {
+            V2ApprovalERC::ERC20 => "https://api.gopluslabs.io/api/v2/token_approval_security",
+            V2ApprovalERC::ERC721 => "https://api.gopluslabs.io/api/v2/nft721_approval_security",
+            V2ApprovalERC::ERC1155 => "https://api.gopluslabs.io/api/v2/nft1155_approval_security/",
+        };
+        let url = format!("{}/{}", base_url, chain_id);
+        
+        Ok(self.inner.get(url)
+            .header("access_token", self.access_token.as_ref().unwrap_or(&"None".to_string()))
+            .query(&[("addresses", address)])
+            .send()
+            .await?
+            .json::<V2ApprovalResponse>()
+            .await?)
+
+        
+        
+
     }
 
     /// Decodes ABI input data for interacting with smart contracts.
@@ -234,7 +198,7 @@ impl Session {
     ///     None
     /// ).await?;
     /// ```
-    /// Response fields in depth [here](https://docs.gopluslabs.io/reference/response-details-4)
+    /// Parameters and response fields in depth [here](https://docs.gopluslabs.io/reference/response-details-4)
     pub async fn abi_decode(&self, 
         chain_id: &str, 
         data: &str,
@@ -254,7 +218,7 @@ impl Session {
         });
 
         Ok(self.inner.post(url)
-            .header("access_token", self.access_token.clone().unwrap_or("None".to_string()))
+            .header("access_token", self.access_token.as_ref().unwrap_or(&"None".to_string()))
             .json(&params)
             .send()
             .await?
@@ -281,7 +245,7 @@ impl Session {
         let url = format!("{}/nft_security/{}",BASE_URL, chain_id);
 
         Ok(self.inner.get(url)
-            .header("access_token", self.access_token.clone().unwrap_or("None".to_string()))
+            .header("access_token", self.access_token.as_ref().unwrap_or(&"None".to_string()))
             .query(&[("contract_addresses", contract_addr), ("token_id", token_id.unwrap_or("None"))])
             .send()
             .await?
@@ -295,7 +259,7 @@ impl Session {
         let url = format!("{}/dapp_security", BASE_URL);
         
         Ok(self.inner.get(url)
-            .header("access_token", self.access_token.clone().unwrap_or("None".to_string()))
+            .header("access_token", self.access_token.as_ref().unwrap_or(&"None".to_string()))
             .query(&[("url", dapp_url)])
             .send()
             .await?
@@ -318,7 +282,7 @@ impl Session {
         let url = format!("{}/phishing_site", BASE_URL);
 
         Ok(self.inner.get(url)
-            .header("access_token", self.access_token.clone().unwrap_or("None".to_string()))
+            .header("access_token", self.access_token.as_ref().unwrap_or(&"None".to_string()))
             .query(&[("url", site_url)])
             .send()
             .await?
@@ -342,14 +306,73 @@ impl Session {
         let url = format!("{}/rugpull_detecting/{}", BASE_URL, chain_id);
 
         Ok(self.inner.get(url)
-            .header("access_token", self.access_token.clone().unwrap_or("None".to_string()))
+            .header("access_token", self.access_token.as_ref().unwrap_or(&"None".to_string()))
             .query(&[("contract_addresses", contract_addr)])
             .send()
             .await?
             .json::<RugPullRiskResponse>()
             .await?)
     }
+
+    /// Obtains an access token using SHA-1 signature method.
+    ///
+    /// # Sign Method
+    /// Concatenate `app_key`, `time`, and `app_secret` in turn, and apply SHA-1 hashing.
+    /// 
+    /// `time` should be +- 1000s around the current timestamp
+    /// 
+    /// # Example
+    /// ```
+    /// let app_key = "mBOMg20QW11BbtyH4Zh0";
+    /// let time = 1647847498;
+    /// let app_secret = "V6aRfxlPJwN3ViJSIFSCdxPvneajuJsh";
+    /// let sign = "sha1(mBOMg20QW11BbtyH4Zh01647847498V6aRfxlPJwN3ViJSIFSCdxPvneajuJsh)"; // This results in `7293d385b9225b3c3f232b76ba97255d0e21063e`
+    /// ```
+    ///
+    /// # Parameters
+    /// - `app_key`: Application key provided by the service.
+    /// - `signature`: Computed SHA-1 hash as a string.
+    /// - `time`: Current time as a UNIX timestamp.
+    ///
+    /// # Example Usage
+    /// ```
+    /// let mut instance = Session::new(None);
+    /// instance.get_access_token("mBOMg20QW11BbtyH4Zh0", "7293d385b9225b3c3f232b76ba97255d0e21063e", 1647847498).await?;
+    /// ```
+    pub async fn get_access_token(&mut self, app_key: &str, signature: &str, time: u64) -> Result<(), anyhow::Error> {
+        let url = format!("{}/token", BASE_URL);
+        // How to do body params?
+
+        let params = json!({
+            "app_key": app_key,
+            "sign": signature,
+            "time": time,
+        });
+
+        let access_code_res = self.inner.get(url)
+            .header("access_token", self.access_token.as_ref().unwrap_or(&"None".to_string()))
+            .json(&params)
+            .send()
+            .await?
+            .json::<AccessCodeResponse>()
+            .await?;
+
+        // access_code_res.result.unwrap().expires_in;
+        if access_code_res.code == 1 {
+            tracing::info!("New access token expires in {} minutes", (access_code_res.result.as_ref().unwrap().expires_in)/60);
+
+            self.access_token = Some(access_code_res.result.unwrap().access_token);
+        } else {
+            tracing::error!("Error getting access token\nCode: {}", access_code_res.code)
+            // ERROR HANDLING
+        };
+        
+        Ok(())
+
+    }
+    
 }
+
 
 
 
