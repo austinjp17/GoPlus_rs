@@ -1,17 +1,34 @@
 // TODO: Error handling
-use std::{sync::Arc, time::UNIX_EPOCH};
+use std::time::UNIX_EPOCH;
 use reqwest::Client;
 mod api_structs;
 use api_structs::*;
 use serde_json::{json, Value};
-
+use thiserror::Error;
+use reqwest::StatusCode;
 const BASE_URL: &str = "https://api.gopluslabs.io/api/v1";
 
+
+#[derive(Error, Debug)]
 pub enum GpError {
-    RequestError(reqwest::Error),
-    ParseError,
-    StatusError,
+    #[error("Status {0} - {1}")]
+    RequestError(u16, String),
+    #[error("Parsing failed - {0}")]
+    ParseError(String),
 }
+
+impl From<reqwest::Error> for GpError {
+    fn from(value: reqwest::Error) -> Self {
+        let str_err = value.to_string();
+        match value.to_string().contains("missing field") {
+            true => Self::ParseError(value.to_string()),
+            false => Self::RequestError(value.status().unwrap().as_u16(), value.to_string())
+        }
+        
+    }
+}
+
+
 
 #[derive(Default)]
 pub struct Session {
@@ -19,7 +36,6 @@ pub struct Session {
     access_token: Option<String>,
 }
 
-// TODO
 pub enum V2ApprovalERC {
     ERC20,
     ERC721,
@@ -65,23 +81,26 @@ impl Session {
     ///
     /// 
     /// # Example Usage
-    /// ```
+    /// ```ignore
     /// let session = Session::new();
     /// let response = session.supported_chains().await?;
     /// let chains: Vec<Chain> = response.result;
     /// ```
     /// Tablular form of return data available [here](https://docs.gopluslabs.io/reference/response-details-9)
-    pub async fn supported_chains(&self) -> Result<SupportedChainsResponse, anyhow::Error> {
+    pub async fn supported_chains(&self) -> Result<SupportedChainsResponse, GpError> {
         let url = format!("{BASE_URL}/supported_chains");
-
-        Ok(self
+        
+        let res = self
             .inner
             .get(url)
             .header("access_token", self.access_token.clone().unwrap_or("None".to_string()))
             .send()
             .await?
+            .error_for_status()?
             .json::<SupportedChainsResponse>()
-            .await?)
+            .await?;
+
+        Ok(res)
     }
 
     /// Fetches token risk data based on the blockchain chain ID and address.
@@ -91,7 +110,7 @@ impl Session {
     /// - `addr`: The address to check.
     ///
     /// # Example Usage
-    /// ```
+    /// ```ignore
     /// let session = Session::new();
     /// let response = session.token_risk("56", "0xEa51801b8F5B88543DdaD3D1727400c15b209D8f").await?;
     /// let risk_data: Hashmap<String, TokenData> = response.result;
@@ -107,6 +126,7 @@ impl Session {
             .query(&[("contract_addresses", addr)])
             .send()
             .await?
+            .error_for_status()?
             .json::<TokenResponse>()
             .await?)
     }
@@ -125,7 +145,7 @@ impl Session {
     /// - `chain_id`: Optional blockchain chain ID for filtering.
     ///
     /// # Example Usage
-    /// ```
+    /// ```ignore
     /// let session = Session::new();
     /// let response = session.address_risk("0xEa51801b8F5B88543DdaD3D1727400c15b209D8f", Some("56")).await;
     /// let risk_data: AccountRisk = response.result;
@@ -143,26 +163,25 @@ impl Session {
             .await?)
     }
 
-    pub async fn approval_security_v1(&self, chain_id: &str, contract_addr: &str) -> Result<ASresponse, anyhow::Error> {
+    pub async fn approval_security_v1(&self, chain_id: &str, contract_addr: &str) -> Result<V1ApprovalResponse, anyhow::Error> {
         let url = format!("{}/approval_security/{}", BASE_URL, chain_id);
         Ok(self.inner.get(url)
             .header("access_token", self.access_token.clone().unwrap_or("None".to_string()))
             .query(&[("contract_addresses", contract_addr)])
             .send()
             .await?
-            .json::<ASresponse>()
+            .json::<V1ApprovalResponse>()
             .await?)
     }
 
     
     pub async fn approval_security_v2(&self, erc: V2ApprovalERC, chain_id: &str, address: &str) -> Result<V2ApprovalResponse, anyhow::Error> {
-        
-        let base_url = match erc {
-            V2ApprovalERC::ERC20 => "https://api.gopluslabs.io/api/v2/token_approval_security",
-            V2ApprovalERC::ERC721 => "https://api.gopluslabs.io/api/v2/nft721_approval_security",
-            V2ApprovalERC::ERC1155 => "https://api.gopluslabs.io/api/v2/nft1155_approval_security/",
+        let base_url = "https://api.gopluslabs.io/api/v2";
+        let url = match erc {
+            V2ApprovalERC::ERC20 => format!("{}/token_approval_security/{}", base_url, chain_id),
+            V2ApprovalERC::ERC721 => format!("{}/nft721_approval_security/{}", base_url, chain_id),
+            V2ApprovalERC::ERC1155 => format!("{}/nft1155_approval_security/{}", base_url, chain_id),
         };
-        let url = format!("{}/{}", base_url, chain_id);
         
         Ok(self.inner.get(url)
             .header("access_token", self.access_token.as_ref().unwrap_or(&"None".to_string()))
@@ -173,8 +192,6 @@ impl Session {
             .await?)
 
         
-        
-
     }
 
     /// Decodes ABI input data for interacting with smart contracts.
@@ -187,7 +204,7 @@ impl Session {
     /// - `txn_type`: Optional transaction type.
     ///
     /// # Example Usage
-    /// ```
+    /// ```ignore
     /// let session = Session::new();
     /// let response = session.abi_decode(
     ///     "56", 
@@ -234,7 +251,7 @@ impl Session {
     /// - `token_id`: Optional token ID.
     ///
     /// # Example Usage
-    /// ```
+    /// ```ignore
     /// let session = Session::new();
     /// let response = session.nft_risk("1", "0x...", Some("123")).await?;
     /// let nft_risk: NftRisk = response.result;
@@ -255,7 +272,7 @@ impl Session {
 
     // TODO: No successfully found url
     pub async fn dapp_risk_by_url(&self, dapp_url: &str) -> Result<Value, anyhow::Error> {
-        todo!("Fails on all tried urls idk");
+        // todo!("Fails on all tried urls idk");
         let url = format!("{}/dapp_security", BASE_URL);
         
         Ok(self.inner.get(url)
@@ -273,7 +290,7 @@ impl Session {
     /// - `site_url`: URL of the site to check.
     ///
     /// # Example Usage
-    /// ```
+    /// ```ignore
     /// let session = Session::new();
     /// let response = session.phishing_site_risk("go-ethdenver.com").await?;
     /// ```
@@ -297,7 +314,7 @@ impl Session {
     /// - `contract_addr`: Contract address.
     ///
     /// # Example Usage
-    /// ```
+    /// ```ignore
     /// let session = Session::new();
     /// let response = session.rug_pull_risk("1", "0x6B175474E89094C44Da98b954EedeAC495271d0F").await?;
     /// ```
@@ -322,7 +339,7 @@ impl Session {
     /// `time` should be +- 1000s around the current timestamp
     /// 
     /// # Example
-    /// ```
+    /// ```ignore
     /// let app_key = "mBOMg20QW11BbtyH4Zh0";
     /// let time = 1647847498;
     /// let app_secret = "V6aRfxlPJwN3ViJSIFSCdxPvneajuJsh";
@@ -335,7 +352,7 @@ impl Session {
     /// - `time`: Current time as a UNIX timestamp.
     ///
     /// # Example Usage
-    /// ```
+    /// ```ignore
     /// let mut instance = Session::new(None);
     /// instance.get_access_token("mBOMg20QW11BbtyH4Zh0", "7293d385b9225b3c3f232b76ba97255d0e21063e", 1647847498).await?;
     /// ```

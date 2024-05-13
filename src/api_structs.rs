@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SupportedChainsResponse {
+    extra: u32,
     code: u32,
     message: String,
     result: Vec<Chain>
@@ -149,14 +150,14 @@ pub struct AccountRisk {
 }
 
 #[derive(Deserialize, Debug, Clone)]
-pub struct ASresponse {
+pub struct V1ApprovalResponse {
     code: u32,
     message: String,
-    result: ASresult,
+    result: V1ApprovalResult,
 }
 
 #[derive(Deserialize, Debug, Clone)]
-pub struct ASresult {
+pub struct V1ApprovalResult {
     contract_name: Option<String>,
     creator_address: Option<String>,
     deployed_time: Option<u64>,  // Assuming it's a timestamp in seconds
