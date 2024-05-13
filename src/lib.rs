@@ -380,7 +380,7 @@ impl Session {
             .json::<AccessCodeResponse>()
             .await?;
 
-        return if access_code_res.code == 1 {
+        if access_code_res.code == 1 {
             tracing::trace!("New access token expires in {} minutes", (access_code_res.result.as_ref().unwrap().expires_in)/60);
             self.access_token = Some(access_code_res.result.unwrap().access_token);
             Ok(())
@@ -388,7 +388,7 @@ impl Session {
         } else {
             tracing::error!("Error getting access token\nCode: {}", access_code_res.code);
             Err(GpError::RequestError(access_code_res.code, access_code_res.message))
-        };
+        }
         
         
 
