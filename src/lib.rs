@@ -88,7 +88,6 @@ impl Session {
     /// Tablular form of return data available [here](https://docs.gopluslabs.io/reference/response-details-9)
     pub async fn supported_chains(&self) -> Result<SupportedChainsResponse, GpError> {
         let url = format!("{BASE_URL}/supported_chains");
-        
         let res = self
             .inner
             .get(url)
@@ -274,8 +273,7 @@ impl Session {
 
     // TODO: No successfully found url
     pub async fn dapp_risk_by_url(&self, dapp_url: &str) -> Result<Value, anyhow::Error> {
-        tracing::warn!("I have been unable to get any response but 'DAPP NOT FOUND', but it should work so you are welcome to try :)");
-        // todo!("Fails on all tried urls idk");
+        tracing::warn!("The only response I've been able to get is 'DAPP NOT FOUND'");
         let url = format!("{}/dapp_security", BASE_URL);
         
         Ok(self.inner.get(url)
@@ -337,6 +335,8 @@ impl Session {
             .await?)
     }
 
+    #[deprecated = "Token retrieved on initialization when keys are env variables. 
+    Can be used if you compute signature (method in documentation)."]
     /// Obtains an access token using SHA-1 signature method.
     ///
     /// # Sign Method
@@ -383,7 +383,7 @@ impl Session {
 
         // access_code_res.result.unwrap().expires_in;
         if access_code_res.code == 1 {
-            tracing::info!("New access token expires in {} minutes", (access_code_res.result.as_ref().unwrap().expires_in)/60);
+            tracing::trace!("New access token expires in {} minutes", (access_code_res.result.as_ref().unwrap().expires_in)/60);
 
             self.access_token = Some(access_code_res.result.unwrap().access_token);
         } else {
