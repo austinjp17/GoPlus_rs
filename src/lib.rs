@@ -12,7 +12,7 @@ const BASE_URL: &str = "https://api.gopluslabs.io/api/v1";
 #[derive(Error, Debug)]
 pub enum GpError {
     #[error("Status {0} - {1}")]
-    RequestError(u16, String),
+    RequestError(u32, String),
     #[error("Parsing failed - {0}")]
     ParseError(String),
 }
@@ -21,7 +21,7 @@ impl From<reqwest::Error> for GpError {
     fn from(value: reqwest::Error) -> Self {
         match value.to_string().contains("missing field") {
             true => Self::ParseError(value.to_string()),
-            false => Self::RequestError(value.status().unwrap().as_u16(), value.to_string())
+            false => Self::RequestError(value.status().unwrap().as_u16().into(), value.to_string())
         }
         
     }
@@ -336,7 +336,7 @@ impl Session {
     }
 
     #[deprecated = "Token retrieved on initialization when keys are env variables. 
-    Can be used if you compute signature (method in documentation)."]
+    Can be used if you compute signature (method in new()/docs)."]
     /// Obtains an access token using SHA-1 signature method.
     ///
     /// # Sign Method
@@ -364,7 +364,6 @@ impl Session {
     /// ```
     pub async fn get_access_token(&mut self, app_key: &str, signature: &str, time: u64) -> Result<(), GpError> {
         let url = format!("{}/token", BASE_URL);
-        // How to do body params?
 
         let params = json!({
             "app_key": app_key,
@@ -381,17 +380,17 @@ impl Session {
             .json::<AccessCodeResponse>()
             .await?;
 
-        // access_code_res.result.unwrap().expires_in;
-        if access_code_res.code == 1 {
+        return if access_code_res.code == 1 {
             tracing::trace!("New access token expires in {} minutes", (access_code_res.result.as_ref().unwrap().expires_in)/60);
-
             self.access_token = Some(access_code_res.result.unwrap().access_token);
+            Ok(())
+            
         } else {
-            tracing::error!("Error getting access token\nCode: {}", access_code_res.code)
-            // ERROR HANDLING
+            tracing::error!("Error getting access token\nCode: {}", access_code_res.code);
+            Err(GpError::RequestError(access_code_res.code, access_code_res.message))
         };
         
-        Ok(())
+        
 
     }
     
